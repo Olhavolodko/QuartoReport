@@ -1,0 +1,185 @@
+---
+title: "POSTNATAL CARE ANALYSIS"
+subtitle: "GLOBAL OVERVIEW OF POSTNATAL CARE FOR NEWBORNS"
+author: "Olha Volodko"
+date: "2024-04-03"
+format: 
+  html:
+    theme: sandstone
+    backgroundcolor: FloralWhite
+    toc: true
+    
+    
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+# libraries
+library(tidyverse)
+library(rnaturalearth)
+library(sf)
+library(readr)
+library(scales)
+library(plotly)
+library(gridExtra)
+
+# data
+unicef_metadata <- read_csv("unicef_metadata.csv") 
+unicef_indicator_2 <- read_csv("unicef_indicator_2.csv") 
+
+# transformations
+merged_data <- unicef_metadata %>%
+  inner_join(unicef_indicator_2, by = c("country", "year" = "time_period"))
+```
+## <span style="color: #E15252; font-weight: bold; font-size: 26px; font-family: Arial;">1. INTRO:</span>
+
+<p style="font-size: 18px; font-family: Arial; color: #808080;"><span style="font-size: 24px; font-weight: bold;">T</span>he comprehensive study covers <span style="color: red; font-weight: bold;">109 countries</span>, delving into the intricate web of factors influencing postpartum care. Key indicators such as GDP, education spending, and health expenditure are scrutinized, providing insights into their perceived impact on postnatal care. This narrative unfolds the global landscape of postnatal care for newborns, leveraging data spanning from 2010 to 2022 ———— <span style="font-family: Forte; color: #FFB2C7;">Olha Volodko</span></p>
+
+```{r}
+#| fig-cap: Global Overview Of Postnatal Care 
+#| 
+# Calculation of the average post-natal care rate
+average_care <- unicef_indicator_2 %>%
+  group_by(alpha_3_code) %>%
+  summarise(avg_postnatal_care = mean(obs_value, na.rm = TRUE))
+
+# Load map data
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+# Merging of average postpartum care data into world map data
+world_with_data <- left_join(world, average_care, by = c("iso_a3" = "alpha_3_code"))
+
+# Add a custom text column to the dataframe for plotly's mouseover text
+world_with_data <- world_with_data %>%
+  mutate(hover_text = sprintf("Country: %s\nAvg Postnatal Care: %.2f%%", name, avg_postnatal_care))
+
+# Creating ggplot plots, referencing custom text
+m <- ggplot(data = world_with_data) +
+  geom_sf(aes(fill = avg_postnatal_care, text = hover_text)) + # Use text aesthetic to reference hover_text
+  scale_fill_gradient(low = "#FFCCCC", high = "#E15252", name = "Avg Postnatal Care (%)") +
+  labs(title = "Average Postnatal Care Percentage by Country",
+       subtitle = "Percentage of newborns receiving postnatal care") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Converts ggplot plots to interactive plotly plots, specifying the use of custom mouse hover text
+interactive_m <- ggplotly(m, tooltip = "text")
+
+# Displaying Interactive Charts
+interactive_m
+
+```
+
+## <span style="color: #E15252; font-weight: bold; font-size: 26px; font-family: Arial;">2. ANALYSIS:</span>
+
+<p style="font-size: 18px; font-family: Arial; color: #808080;"><span style="font-size: 24px; font-weight: bold;">I</span>n the global pursuit of enhanced postnatal care, the data unfolds a promising narrative. Over the years, countries have made significant strides, with postnatal care rates consistently on the rise ———— <span style="font-family: Forte; color: #FFB2C7;">Olha Volodko</span></p>
+
+```{r}
+#| fig-cap: Global Overview Of Postnatal Care 
+#| 
+# Selection of countries with at least three years of data
+countries_with_at_least_three_years <- unicef_indicator_2 %>%
+  group_by(country) %>%
+  filter(n_distinct(time_period) >= 3) %>%
+  ungroup()
+
+# Plotting time series
+p <- ggplot(countries_with_at_least_three_years, aes(x = time_period, y = obs_value, group = country, color = country)) +
+  geom_line() +  # Drawing Lines
+  geom_point() +  # Add points to highlight each data point
+  theme_minimal() +
+  labs(title = "Postnatal Care Rate Trends Over Time by Country",
+       x = "Year",
+       y = "Postnatal Care Rate (%)") +
+  theme(legend.position = "right")  # Place the legend on the right
+
+# Converting ggplot2 Graphs to Interactive Graphs
+ggplotly(p)
+
+```
+
+## <span style="color: #E15252; font-weight: bold; font-size: 26px; font-family: Arial;">3. DEEP ANALYSIS:</span>
+
+<p style="font-size: 18px; font-family: Arial; color: #808080;"><span style="font-size: 24px; font-weight: bold;">C</span>ountries investing more in healthcare and education tend to exhibit higher postnatal care rates, fostering healthier beginnings for newborns. This positive correlation extends its influence to average life expectancy, <span style="color: #E15252; font-style: italic;">highlighting</span> the profound impact of robust postnatal care on overall societal well-being ———— <span style="font-family: Forte; color: #FFB2C7;">Olha Volodko</span></p>
+
+```{r}
+#| fig-cap: Global Overview Of Postnatal Care 
+#| 
+# Calculation of average life expectancy and average share of postnatal care per country
+average_data <- merged_data %>%
+  group_by(country) %>%
+  summarise(
+    avg_life_expectancy = mean(`Life expectancy at birth, total (years)`, na.rm = TRUE),
+    avg_postnatal_care = mean(obs_value, na.rm = TRUE)
+  )
+
+# top 10 countries in terms of average life expectancy
+top_avg_life_expectancy <- average_data %>%
+  arrange(desc(avg_life_expectancy)) %>%
+  slice_head(n = 10)
+
+# For the top 10 countries in terms of average share of postpartum care
+top_avg_postnatal_care <- average_data %>%
+  arrange(desc(avg_postnatal_care)) %>%
+  slice_head(n = 10)
+
+# Define a color vector that recursively uses two colors
+colors <- c("#E15252", "#52E1E1", "#E1E152", "#52E152", "#5252E1",
+            "#E152E1", "#E18252", "#52E1A1", "#A1E152", "#E152A1")
+
+# Updated p1 chart
+p1 <- ggplot(top_avg_life_expectancy, aes(x = reorder(country, avg_life_expectancy), y = avg_life_expectancy, fill = country)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  labs(title = "Top 10 Countries by Average Life Expectancy",
+       x = "", y = "Average Life Expectancy (Years)") +
+  theme(legend.title = element_blank(), legend.position = "none")
+
+# Updated p2 chart
+p2 <- ggplot(top_avg_postnatal_care, aes(x = reorder(country, avg_postnatal_care), y = avg_postnatal_care, fill = country)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  scale_fill_manual(values = colors) +
+  theme_minimal() +
+  labs(title = "Top 10 Countries by Average Postnatal Care Percentage",
+       x = "", y = "Average Postnatal Care (%)") +
+  theme(legend.title = element_blank(), legend.position = "none")
+
+# Arranging shapes up and down using grid.arrange
+grid.arrange(p1, p2, ncol = 1)
+```
+
+## <span style="color: #E15252; font-weight: bold; font-size: 26px; font-family: Arial;">4. OUTCOME:</span>
+
+<p style="font-size: 18px; font-family: Arial; color: #808080;"><span style="font-size: 24px; font-weight: bold;">A</span>s we navigate through the rich tapestry of global postnatal care data, it becomes evident that nurturing newborns is not just a healthcare initiative but a socio-economic investment. This story underscores the progress made and the collective responsibility to continue advancing postnatal care for a healthier and more resilient global population ———— <span style="font-family: Forte; color: #FFB2C7;">Olha Volodko</span></p>
+
+```{r}
+# Calculation of average postnatal care rates and GDP per capita per country
+average_data <- merged_data %>%
+  group_by(country) %>%
+  summarise(avg_postnatal_care = mean(obs_value, na.rm = TRUE),
+            avg_gdp_per_capita = mean(`GDP per capita (constant 2015 US$)`, na.rm = TRUE))
+
+# Generate a scatterplot and add a linear regression line
+s <- ggplot(average_data, aes(x = avg_gdp_per_capita, y = avg_postnatal_care)) +
+  geom_point(aes(color = country), size = 2) +  # Mark different countries with colors
+  geom_smooth(method = "lm", color = "blue", formula = y ~ x) +  # Adding a linear regression line
+  coord_cartesian(ylim = c(0, 100)) +  # Limit the display range of the y-axis to ensure that it does not exceed 100 percent
+  theme_minimal() +
+  labs(title = "Average Postnatal Care Rate vs. GDP per Capita",
+       x = "Average GDP per Capita (Constant 2015 US$)",
+       y = "Average Postnatal Care Rate (%)") +
+  theme(legend.position = "none") 
+
+# Converting ggplot2 Graphs to Interactive Graphs
+ggplotly(s)
+```
+
